@@ -61,6 +61,8 @@ edge-gateway-hub/
 └── README.md
 ```
 
+> **Implementation status:** All scripts and configuration files described in this specification have been implemented. Run `bash scripts/setup-gateway.sh` to get started.
+
 ---
 
 ## 5. Script & Workflow Specification

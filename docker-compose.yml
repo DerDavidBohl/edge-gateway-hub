@@ -1,0 +1,41 @@
+version: "3.8"
+
+# edge-gateway-hub – Docker Compose stack
+#
+# Architecture:
+#   wireguard  – WireGuard VPN hub; also owns the exposed host ports so that
+#                nginx (which shares its network namespace) can bind to them.
+#   nginx      – Layer-4 stream proxy; uses network_mode: service:wireguard so
+#                it can reach WireGuard peer IPs via the wg0 interface.
+
+services:
+  wireguard:
+    image: lscr.io/linuxserver/wireguard:latest
+    container_name: wireguard
+    cap_add:
+      - NET_ADMIN
+      - SYS_MODULE
+    environment:
+      - PUID=0
+      - PGID=0
+    volumes:
+      - ./data/wireguard:/config
+    ports:
+      - "${WG_PORT:-51820}:51820/udp"
+      - "80:80"
+      - "443:443"
+    sysctls:
+      - net.ipv4.conf.all.src_valid_mark=1
+    restart: unless-stopped
+
+  nginx:
+    image: nginx:alpine
+    container_name: nginx
+    # Share wireguard's network namespace → nginx can reach wg0 peer IPs
+    network_mode: "service:wireguard"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./data/nginx:/etc/nginx/stream.d:ro
+    depends_on:
+      - wireguard
+    restart: unless-stopped
