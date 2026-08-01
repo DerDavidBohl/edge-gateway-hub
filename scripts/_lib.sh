@@ -63,6 +63,8 @@ require_sites() {
 _wg_genkey() {
     if command -v wg &>/dev/null; then
         wg genkey
+    elif ! command -v docker &>/dev/null; then
+        require_docker
     elif docker inspect --format '{{.State.Running}}' wireguard 2>/dev/null | grep -q true; then
         docker exec wireguard wg genkey
     else
@@ -75,6 +77,8 @@ _wg_pubkey() {
     local private_key="$1"
     if command -v wg &>/dev/null; then
         printf '%s' "$private_key" | wg pubkey
+    elif ! command -v docker &>/dev/null; then
+        require_docker
     elif docker inspect --format '{{.State.Running}}' wireguard 2>/dev/null | grep -q true; then
         printf '%s' "$private_key" | docker exec -i wireguard wg pubkey
     else
