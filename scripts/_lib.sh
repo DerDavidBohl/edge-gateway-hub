@@ -232,7 +232,7 @@ reload_wireguard() {
     if docker inspect --format '{{.State.Running}}' wireguard 2>/dev/null | grep -q true; then
         echo "Reloading WireGuard..."
         if ! docker exec wireguard sh -c \
-                'wg syncconf wg0 <(wg-quick strip /config/wg_confs/wg0.conf)' 2>/dev/null; then
+                'wg-quick strip /config/wg_confs/wg0.conf | wg syncconf wg0 /dev/stdin' 2>/dev/null; then
             echo "syncconf unavailable – restarting WireGuard container..."
             docker restart wireguard
         fi
