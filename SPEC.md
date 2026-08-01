@@ -1,0 +1,91 @@
+# Project Specification: edge-gateway-hub
+
+## 1. Architecture & Core Features
+
+* **100% Containerized Stack:** All services (Nginx and WireGuard) run isolated as Docker containers on a public-facing host (Edge Gateway).
+* **Nginx Stream Module (TCP SNI Passthrough & UDP Support):** Nginx operates at Layer 4 (Transport layer) using the Stream module. Domain-based routing is handled via TCP SNI passthrough (`ssl_preread`), keeping certificate management and TLS termination completely on the destination sites. Additionally, native UDP routing is supported for port-based services.
+* **Isolated Network Routing:** Routing is handled independently within container and WireGuard interfaces, requiring no host firewall modifications.
+* **State & Key Management:** All cryptographic keys, IP allocations, and routing configurations are persistently stored locally in the `./data/` directory on the gateway host.
+
+---
+
+## 2. Glossary (Terminology)
+
+* **Edge Gateway (Public Node):** The centrally accessible host (whether a cloud VPS, a dedicated root server, or a home server with a public IP) acting as the entry point.
+* **Edge Proxy (Nginx Stream):** The container on the gateway responsible for Layer 4 TCP and UDP routing.
+* **WireGuard Hub:** The central WireGuard service on the gateway that establishes the overlay networks.
+* **Access Clients:** Mobile or temporary endpoints (laptops, smartphones) connecting from the road to access private resources.
+* **Internal Nodes:** Private peers/sites (home servers, NAS) that are not publicly exposed and are only accessible to Access Clients.
+* **Edge Service Peers:** Peers hosting public services (TCP/UDP) exposed via the Edge Proxy.
+* **IP Address Management (IPAM):** The structured assignment and tracking of internal IP addresses via a local state file (`ipam.json`).
+* **Site:** A specific application on an Edge Service Peer reachable via a public domain or fixed port.
+
+---
+
+## 3. The 3 WireGuard Networks (Security Zones)
+
+Traffic is strictly separated into three isolated subnets:
+
+1. **Access Client Network (e.g., `10.101.0.0/24`):**
+   * For road warriors and administrators.
+   * Grants access to *Internal Nodes*.
+2. **Internal Node Network (e.g., `10.102.0.0/24`):**
+   * For private home servers and containers.
+   * Only internally accessible to Access Clients.
+3. **Edge Service Network (e.g., `10.103.0.0/24`):**
+   * For publicly accessible services (Web/TCP or UDP).
+   * The Nginx proxy routes external traffic directly to these peers.
+
+---
+
+## 4. Repository Structure
+
+```text
+edge-gateway-hub/
+├── .env.example              # Configuration template (Public IP, subnets, ports)
+├── docker-compose.yml        # Orchestration for Nginx and WireGuard
+├── data/                     # Persistent state
+│   ├── ipam.json             # Structured IP and type management
+│   ├── keys/                 # Automatically generated keys & client configuration files
+│   └── nginx/                # Dynamically generated Nginx stream configurations
+├── scripts/
+│   ├── setup-gateway.sh      # Initializes gateway setup and starts the stack
+│   ├── peer/                 # Scripts for WireGuard participants
+│   │   ├── add.sh            # Generates keys, updates IPAM, server config AND client/peer config file
+│   │   ├── remove.sh         # Removes peer and releases IP
+│   │   └── list.sh           # Lists active peers/clients
+│   └── site/                 # Scripts for domain/port forwarding
+│       ├── add.sh            # Maps a domain/port combination to an Edge Service Peer IP
+│       ├── remove.sh         # Deletes forwarding
+│       └── list.sh           # Lists active routings
+└── README.md
+```
+
+---
+
+## 5. Script & Workflow Specification
+
+### A. Initialization (`setup-gateway.sh`)
+* Interactively prompts for basic parameters (Public Gateway IP, subnets for the three zones, UDP ports).
+* Creates the `.env` file and the directory structure for persistent state (`data/`).
+* Starts the container stack via Docker Compose.
+
+### B. Peer & Client Management (`scripts/peer/`)
+* **`add.sh <name> <type>`** (where `<type>` accepts `client`, `internal`, or `edge`):
+  * Checks `ipam.json` and determines the next available IP in the corresponding subnet.
+  * Generates a local WireGuard key pair and saves it under `data/keys/<name>/`.
+  * **Automatically generates a complete WireGuard configuration file (`data/keys/<name>/<name>.conf`)** containing all necessary parameters (client/peer private key, assigned IP, public gateway endpoint, server public key, type-specific `AllowedIPs`, and keepalive settings).
+  * Adds the peer to the server configuration and performs a hot reload of the WireGuard container.
+* **`remove.sh <name>`:**
+  * Removes the peer from the server configuration, releases the IP in IPAM, and cleans up keys and generated configuration files.
+* **`list.sh`:**
+  * Outputs a tabular overview of all registered peers, their zones, and IP addresses.
+
+### C. Site & Domain Routing (`scripts/site/`)
+* **`add.sh <domain-or-port> <target-ip> <target-port> [protocol]`:**
+  * Creates a new TCP SNI routing block (or UDP stream block) in the Nginx stream configuration.
+  * Performs a zero-downtime reload (`nginx -s reload`) of the proxy container.
+* **`remove.sh <domain-or-port>`:**
+  * Removes the corresponding routing block and updates the proxy.
+* **`list.sh`:**
+  * Displays all active forwards.
