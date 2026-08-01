@@ -117,6 +117,11 @@ get_next_ip() {
         exit 1
     }
 
+    [[ "$subnet" =~ ^([0-9]{1,3}\.){3}0/24$ ]] || {
+        echo "Error: Subnet for '$type' must be a valid IPv4 /24 CIDR (got '$subnet')." >&2
+        exit 1
+    }
+
     # Extract base, e.g. "10.101.0.0/24" → "10.101.0"
     local network="${subnet%/*}"
     local base="${network%.*}"
@@ -193,7 +198,7 @@ rebuild_nginx_configs() {
                    | select(.value.type == "domain")
                    | "    \(.key) \(.value.target_ip):\(.value.target_port);"' \
                 "$SITES_FILE"
-            printf '    default "";\n'
+            printf '    default 127.0.0.1:9;\n'
             printf '}\n\n'
             printf 'server {\n'
             printf '    listen 443;\n'

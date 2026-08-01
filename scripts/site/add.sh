@@ -34,6 +34,11 @@ TARGET_IP="$2"
 TARGET_PORT="$3"
 PROTOCOL="${4:-tcp}"
 
+is_valid_port() {
+    local p="$1"
+    [[ "$p" =~ ^[0-9]+$ ]] && (( p >= 1 && p <= 65535 ))
+}
+
 # ─── Validate inputs ──────────────────────────────────────────────────────────
 
 require_jq
@@ -44,8 +49,8 @@ require_sites
     exit 1
 }
 
-[[ "$TARGET_PORT" =~ ^[0-9]+$ ]] || {
-    echo "Error: target-port must be a number." >&2
+is_valid_port "$TARGET_PORT" || {
+    echo "Error: target-port must be a number in range 1-65535." >&2
     exit 1
 }
 
@@ -58,6 +63,10 @@ fi
 # A numeric key → port-based routing; anything else → domain SNI routing.
 
 if [[ "$KEY" =~ ^[0-9]+$ ]]; then
+    is_valid_port "$KEY" || {
+        echo "Error: source port must be in range 1-65535." >&2
+        exit 1
+    }
     SITE_TYPE="port"
     SOURCE_PORT="$KEY"
 else

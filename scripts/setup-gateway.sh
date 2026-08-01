@@ -25,6 +25,23 @@ ask() {
     fi
 }
 
+is_valid_port() {
+    local p="$1"
+    [[ "$p" =~ ^[0-9]+$ ]] && (( p >= 1 && p <= 65535 ))
+}
+
+is_valid_subnet_24() {
+    local s="$1"
+    [[ "$s" =~ ^([0-9]{1,3}\.){3}0/24$ ]] || return 1
+
+    local o1 o2 o3 o4
+    IFS=. read -r o1 o2 o3 o4 <<< "${s%/*}"
+    for octet in "$o1" "$o2" "$o3" "$o4"; do
+        [[ "$octet" =~ ^[0-9]+$ ]] || return 1
+        (( octet >= 0 && octet <= 255 )) || return 1
+    done
+}
+
 # Extract the first host address (.1) from a CIDR, e.g. 10.101.0.0/24 → 10.101.0.1
 _net_hub_ip() {
     local network="${1%/*}"   # strip prefix
@@ -93,6 +110,11 @@ WG_PORT="$(ask "WireGuard UDP listen port" "51820")"
 CLIENT_SUBNET="$(ask  "Access Client subnet  (client zone)"    "10.101.0.0/24")"
 INTERNAL_SUBNET="$(ask "Internal Node subnet  (internal zone)"  "10.102.0.0/24")"
 EDGE_SUBNET="$(ask     "Edge Service subnet   (edge zone)"       "10.103.0.0/24")"
+
+is_valid_port "$WG_PORT" || err "WireGuard port must be a number in range 1-65535."
+is_valid_subnet_24 "$CLIENT_SUBNET" || err "Access Client subnet must be a valid IPv4 /24 CIDR (e.g. 10.101.0.0/24)."
+is_valid_subnet_24 "$INTERNAL_SUBNET" || err "Internal Node subnet must be a valid IPv4 /24 CIDR (e.g. 10.102.0.0/24)."
+is_valid_subnet_24 "$EDGE_SUBNET" || err "Edge Service subnet must be a valid IPv4 /24 CIDR (e.g. 10.103.0.0/24)."
 
 echo ""
 

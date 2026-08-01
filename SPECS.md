@@ -69,6 +69,7 @@ edge-gateway-hub/
 
 ### A. Initialization (`setup-gateway.sh`)
 * Interactively prompts for basic parameters (Public Gateway IP, subnets for the three zones, UDP ports).
+* Validates that `WG_PORT` is within `1-65535` and that all three zone subnets are IPv4 `/24` CIDRs before generating configuration.
 * Creates the `.env` file and the directory structure for persistent state (`data/`).
 * Starts the container stack via Docker Compose.
 
@@ -86,6 +87,7 @@ edge-gateway-hub/
 ### C. Site & Domain Routing (`scripts/site/`)
 * **`add.sh <domain-or-port> <target-ip> <target-port> [protocol]`:**
   * Creates a new TCP SNI routing block (or UDP stream block) in the Nginx stream configuration.
+  * Validates `target-port` (and source port for port-based routes) as valid TCP/UDP ports in the range `1-65535`.
   * Performs a zero-downtime reload (`nginx -s reload`) of the proxy container.
 * **`remove.sh <domain-or-port>`:**
   * Removes the corresponding routing block and updates the proxy.
