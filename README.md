@@ -82,17 +82,31 @@ The generated `data/keys/<name>/<name>.conf` is a ready-to-use WireGuard client 
 Access Client profiles use the gateway's Internal Node Network address as their
 DNS server. An Internal Node named `homeserver` is therefore reachable at both
 `10.102.0.2` and `homeserver.internal`. DNS records are derived automatically
-from `data/ipam.json` and written to `data/dns/hosts`.
+from `data/ipam.json` and written to `data/dns/hosts`. You can also assign a
+private domain to an Internal Node; it resolves directly to that node only for
+WireGuard clients, even if the name has a public DNS record.
 
 Public domains for Edge Service Peers remain normal public-DNS records: point
 their A/AAAA records at the gateway's public IP, then configure SNI routing
 with `scripts/site/add.sh`.
 
+For subdomain routing, add an explicit wildcard route such as
+`*.media.example.com`. It matches `myservice.media.example.com`, but not
+`media.example.com`; add that parent domain separately if needed. Create a
+public `*.media.example.com` DNS record pointing to the gateway. Exact domain
+routes and more-specific wildcard routes take precedence.
+
 ### 3. Expose a service
 
 ```bash
-# SNI passthrough for a domain (HTTPS port 443)
+# Private DNS for an Internal Node; connect directly to its service port
+bash scripts/site/add.sh media.home.arpa homeserver
+
+# SNI passthrough for an exact domain (HTTPS port 443)
 bash scripts/site/add.sh example.com services01 443
+
+# SNI passthrough for all subdomains (not example.com itself)
+bash scripts/site/add.sh '*.example.com' services01 443
 
 # Port-based TCP forwarding
 bash scripts/site/add.sh 8080 services01 8080 tcp
@@ -115,9 +129,9 @@ bash scripts/site/add.sh 53 services01 53 udp
 
 | Script | Description |
 |--------|-------------|
-| `add.sh <domain\|port> <target-peer-name> <target-port> [protocol]` | Add SNI or port-based routing to an Edge Service Peer, reload Nginx |
-| `remove.sh <domain\|port>` | Remove routing rule, reload Nginx |
-| `list.sh` | Tabular overview of all active forwarding rules |
+| `add.sh <domain\|port> <target-peer-name> [target-port] [protocol]` | Add a private DNS domain for an Internal Node, or SNI/port routing for an Edge Service Peer |
+| `remove.sh <domain\|port>` | Remove a private DNS or public routing rule |
+| `list.sh` | Tabular overview of all active private DNS and public routing rules |
 
 ## Data directory layout
 
@@ -125,8 +139,8 @@ bash scripts/site/add.sh 53 services01 53 udp
 data/
 ├── ipam.json               # IP allocations and peer registry
 ├── dns/
-│   └── hosts                # Generated <internal-node>.internal records
-├── sites.json              # Nginx routing rules
+│   └── hosts                # Generated Internal Node names and private domain records
+├── sites.json              # Private DNS aliases and Nginx routing rules
 ├── wireguard/
 │   ├── server_private.key  # ⚠ secret – never commit
 │   ├── server_public.key

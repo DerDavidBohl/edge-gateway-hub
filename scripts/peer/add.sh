@@ -126,6 +126,7 @@ jq --arg name "$NAME" \
    "$IPAM_FILE" > "${IPAM_FILE}.tmp"
 mv "${IPAM_FILE}.tmp" "$IPAM_FILE"
 rebuild_dns_hosts
+reload_coredns
 
 # ─── Update WireGuard server config and hot-reload ───────────────────────────
 

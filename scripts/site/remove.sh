@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# edge-gateway-hub – Remove an Nginx stream routing rule
+# edge-gateway-hub – Remove a public routing or private DNS site rule
 # Usage: remove.sh <domain|port>
 set -euo pipefail
 
@@ -42,10 +42,12 @@ echo "Removing site '$KEY'..."
 jq --arg key "$KEY" 'del(.sites[$key])' "$SITES_FILE" > "${SITES_FILE}.tmp"
 mv "${SITES_FILE}.tmp" "$SITES_FILE"
 
-# ─── Regenerate Nginx configs and reload ──────────────────────────────────────
+# ─── Regenerate Nginx and private DNS configs ─────────────────────────────────
 
 rebuild_nginx_configs
+rebuild_dns_hosts
 reload_nginx
+reload_coredns
 
 echo ""
 echo "✓ Site '$KEY' removed successfully."

@@ -56,21 +56,50 @@ require_sites() {
     }
 }
 
-# Return the WireGuard address for a registered Edge Service Peer.
-edge_peer_ip() {
+# Return the registered type for a peer.
+peer_type() {
+    local name="$1"
+    require_ipam
+
+    local type
+    type="$(jq -r --arg name "$name" '.peers[$name].type // empty' "$IPAM_FILE")"
+
+    [[ -n "$type" ]] || {
+        echo "Error: Peer '$name' was not found in IPAM." >&2
+        return 1
+    }
+
+    printf '%s\n' "$type"
+}
+
+# Return the WireGuard address for a registered peer.
+peer_ip() {
     local name="$1"
     require_ipam
 
     local ip
-    ip="$(jq -r --arg name "$name" \
-        '.peers[$name] | select(.type == "edge") | .ip // empty' "$IPAM_FILE")"
+    ip="$(jq -r --arg name "$name" '.peers[$name].ip // empty' "$IPAM_FILE")"
 
     [[ -n "$ip" ]] || {
-        echo "Error: Edge Service Peer '$name' was not found in IPAM." >&2
+        echo "Error: Peer '$name' was not found in IPAM." >&2
         return 1
     }
 
     printf '%s\n' "$ip"
+}
+
+# Return the WireGuard address for a registered Edge Service Peer.
+edge_peer_ip() {
+    local name="$1"
+    local type
+    type="$(peer_type "$name")" || return 1
+
+    [[ "$type" == "edge" ]] || {
+        echo "Error: Edge Service Peer '$name' was not found in IPAM." >&2
+        return 1
+    }
+
+    peer_ip "$name"
 }
 
 # ─── WireGuard key generation ─────────────────────────────────────────────────
@@ -173,15 +202,28 @@ hub_ip() {
     printf '%s.1\n' "${network%.*}"
 }
 
-# Rebuild authoritative internal DNS records from Internal Node allocations.
+# Rebuild private DNS records from Internal Node allocations and site aliases.
 rebuild_dns_hosts() {
     require_ipam
+    require_sites
     mkdir -p "$DNS_DIR"
 
-    jq -r '.peers | to_entries[]
-           | select(.value.type == "internal")
-           | "\(.value.ip) \(.key).internal"' \
-        "$IPAM_FILE" > "${DNS_HOSTS_FILE}.tmp"
+    {
+        jq -r '.peers | to_entries[]
+               | select(.value.type == "internal")
+               | "\(.value.ip) \(.key).internal"' \
+            "$IPAM_FILE"
+        jq -r --slurpfile sites "$SITES_FILE" \
+            '. as $ipam
+             | $sites[0].sites
+             | to_entries[]
+             | select(.value.type == "internal-domain")
+             | . as $site
+             | $ipam.peers[$site.value.target_peer]
+             | select(.type == "internal")
+             | "\(.ip) \($site.key)"' \
+            "$IPAM_FILE"
+    } > "${DNS_HOSTS_FILE}.tmp"
     mv "${DNS_HOSTS_FILE}.tmp" "$DNS_HOSTS_FILE"
     chmod 644 "$DNS_HOSTS_FILE"
 }
@@ -237,6 +279,7 @@ rebuild_nginx_configs() {
     if [[ "$domain_count" -gt 0 ]]; then
         {
             printf 'map $ssl_preread_server_name $tcp_sni_backend {\n'
+            printf '    hostnames;\n'
             while IFS=$'\t' read -r key target_peer target_port; do
                 local target_ip
                 target_ip="$(edge_peer_ip "$target_peer")" || {
@@ -309,6 +352,18 @@ reload_nginx() {
         docker exec nginx nginx -s reload
     else
         echo "Nginx container not running – config saved."
+        echo "Start with: docker compose up -d"
+    fi
+}
+
+# Restart CoreDNS to apply its mounted configuration. The hosts plugin then
+# observes subsequent hosts-file updates without another restart.
+reload_coredns() {
+    if docker inspect --format '{{.State.Running}}' coredns 2>/dev/null | grep -q true; then
+        echo "Restarting CoreDNS..."
+        docker restart coredns >/dev/null
+    else
+        echo "CoreDNS container not running – DNS records saved."
         echo "Start with: docker compose up -d"
     fi
 }

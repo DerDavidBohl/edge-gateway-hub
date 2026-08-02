@@ -19,8 +19,8 @@
 * **Internal Nodes:** Private peers/sites (home servers, NAS) that are not publicly exposed and are only accessible to Access Clients.
 * **Edge Service Peers:** Peers hosting public services (TCP/UDP) exposed via the Edge Proxy.
 * **IP Address Management (IPAM):** The structured assignment and tracking of internal IP addresses via a local state file (`ipam.json`).
-* **Site:** A specific application on an Edge Service Peer reachable via a public domain or fixed port.
-* **Internal DNS Record:** An automatically generated `<internal-peer-name>.internal` A record mapped to an Internal Node's WireGuard address.
+* **Site:** A specific application on an Edge Service Peer reachable via a public domain or fixed port, or a private domain mapped directly to an Internal Node.
+* **Internal DNS Record:** An automatically generated `<internal-peer-name>.internal` A record, or an explicitly configured private domain, mapped to an Internal Node's WireGuard address.
 
 ---
 
@@ -50,10 +50,10 @@ edge-gateway-hub/
 │   └── node/
 │       └── docker-compose.yml # Internal/Edge Node WireGuard and Traefik example
 ├── coredns/
-│   └── Corefile              # Authoritative internal-zone and forwarding configuration
+│   └── Corefile              # Private-DNS overrides and forwarding configuration
 ├── data/                     # Persistent state
 │   ├── dns/
-│   │   └── hosts             # Generated Internal Node hostname-to-IP records
+│   │   └── hosts             # Generated Internal Node and private-domain records
 │   ├── ipam.json             # Structured IP and type management
 │   ├── keys/                 # Automatically generated keys & client configuration files
 │   └── nginx/                # Dynamically generated Nginx stream configurations
@@ -63,10 +63,10 @@ edge-gateway-hub/
 │   │   ├── add.sh            # Generates keys, updates IPAM, server config AND client/peer config file
 │   │   ├── remove.sh         # Removes peer and releases IP
 │   │   └── list.sh           # Lists active peers/clients
-│   └── site/                 # Scripts for domain/port forwarding
-│       ├── add.sh            # Maps a domain/port combination to an Edge Service Peer IP
-│       ├── remove.sh         # Deletes forwarding
-│       └── list.sh           # Lists active routings
+│   └── site/                 # Scripts for private DNS and public forwarding
+│       ├── add.sh            # Maps a private domain or public route to a peer
+│       ├── remove.sh         # Deletes a site rule
+│       └── list.sh           # Lists active site rules
 └── README.md
 ```
 
@@ -89,20 +89,22 @@ edge-gateway-hub/
   * Generates a local WireGuard key pair and saves it under `data/keys/<name>/`.
   * **Automatically generates a complete WireGuard configuration file (`data/keys/<name>/<name>.conf`)** containing all necessary parameters (client/peer private key, assigned IP, public gateway endpoint, server public key, type-specific `AllowedIPs`, and keepalive settings).
   * Adds the peer to the server configuration and performs a hot reload of the WireGuard container.
-  * Regenerates the CoreDNS hosts file; each Internal Node receives `<name>.internal` mapped to its allocated Internal Node Network address.
+  * Regenerates the CoreDNS hosts file and reloads CoreDNS; each Internal Node receives `<name>.internal` mapped to its allocated Internal Node Network address.
 * **`remove.sh <name>`:**
   * Removes the peer from the server configuration, releases the IP in IPAM, cleans up keys and generated configuration files, and regenerates DNS records.
-  * Refuses to remove an Edge Service Peer while site routing rules reference its name.
+  * Refuses to remove a peer while a private DNS or public routing rule references its name.
 * **`list.sh`:**
   * Outputs a tabular overview of all registered peers, their zones, and IP addresses.
 
 ### C. Site & Domain Routing (`scripts/site/`)
-* **`add.sh <domain-or-port> <target-peer-name> <target-port> [protocol]`:**
-  * Resolves the named Edge Service Peer from IPAM and rejects unknown or non-edge peers.
+* **`add.sh <domain-or-port> <target-peer-name> [target-port] [protocol]`:**
+  * Resolves the named peer from IPAM. Port routes and public domain routes require an Edge Service Peer. A domain targeting an Internal Node creates a private DNS record and does not require a target port.
   * Stores the peer name in the site definition and resolves its current WireGuard address when generating Nginx configuration.
-  * Creates a new TCP SNI routing block (or UDP stream block) in the Nginx stream configuration.
+  * Creates a new TCP SNI routing block (or UDP stream block) in the Nginx stream configuration. Domain routes support exact hostnames and leading-wildcard hostnames (for example, `*.media.example.com`); exact and more-specific wildcard routes take precedence.
+  * Wildcard routes require matching public wildcard DNS records (for example, `*.media.example.com`) that point to the gateway. They do not match the parent domain, which must be added separately when needed.
+  * Private domain routes are served by CoreDNS only to WireGuard clients and resolve directly to the Internal Node address. They may deliberately override a public DNS name for those clients; the service port is selected by the client or a reverse proxy on the Internal Node.
   * Validates `target-port` (and source port for port-based routes) as valid TCP/UDP ports in the range `1-65535`.
-  * Performs a zero-downtime reload (`nginx -s reload`) of the proxy container.
+  * Performs a zero-downtime reload (`nginx -s reload`) for public routes, or restarts CoreDNS for private DNS changes.
 * **`remove.sh <domain-or-port>`:**
   * Removes the corresponding routing block and updates the proxy.
 * **`list.sh`:**
@@ -110,7 +112,7 @@ edge-gateway-hub/
 
 ### D. DNS Resolution
 
-* **Authoritative internal zone:** The `coredns` container shares the WireGuard network namespace and is not published on a host DNS port. It is authoritative for `internal`; generated records are stored in `data/dns/hosts`, with `ipam.json` as their source of truth. An Internal Node named `home-server` resolves as `home-server.internal` to its `10.102.x.x` address.
+* **Private DNS:** The `coredns` container shares the WireGuard network namespace and is not published on a host DNS port. Generated records are stored in `data/dns/hosts`, with `ipam.json` and private site definitions as their source of truth. An Internal Node named `home-server` resolves as `home-server.internal` to its `10.102.x.x` address, and a configured private domain resolves directly to its assigned address.
 * **WireGuard clients:** Generated Access Client profiles configure `DNS = <Internal Node Network hub address>`, normally `10.102.0.1`. Their existing route to the Internal Node Network therefore carries DNS queries to the gateway. Internal and Edge Service Peer profiles do not use the gateway DNS unless their operators configure it explicitly.
 * **Public names:** Queries outside `internal`, including public domains used by Edge Service Peers, are forwarded by CoreDNS to its configured upstream resolver. Public internet clients resolve Edge Service Peer domains through normal public DNS, which must publish A/AAAA records pointing to the gateway's public IP; Nginx then selects the private backend by SNI.
 

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# edge-gateway-hub – List active Nginx stream routing rules
+# edge-gateway-hub – List active public routing and private DNS site rules
 # Usage: list.sh
 set -euo pipefail
 
@@ -17,16 +17,16 @@ printf '  %-30s  %-8s  %-8s  %-20s  %-18s  %s\n' \
 
 site_count=0
 while IFS=$'\t' read -r key type protocol target_peer target_port; do
-    target_ip="$(edge_peer_ip "$target_peer")" || exit 1
+    target_ip="$(peer_ip "$target_peer")" || exit 1
     printf '  %-30s  %-8s  %-8s  %-20s  %-18s  %s\n' \
         "$key" "$type" "$protocol" "$target_peer" "$target_ip" "$target_port"
     (( site_count++ )) || true
 done < <(jq -r '.sites | to_entries[]
                 | [.key,
                    .value.type,
-                   .value.protocol,
+                   (.value.protocol // "dns"),
                    .value.target_peer,
-                   (.value.target_port | tostring)]
+                   (.value.target_port // "-" | tostring)]
                 | @tsv' "$SITES_FILE")
 
 echo ""
