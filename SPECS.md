@@ -46,6 +46,9 @@ Traffic is strictly separated into three isolated subnets:
 edge-gateway-hub/
 ├── .env.example              # Configuration template (Public IP, subnets, ports)
 ├── docker-compose.yml        # Orchestration for Nginx, WireGuard, and CoreDNS
+├── examples/
+│   └── node/
+│       └── docker-compose.yml # Internal/Edge Node WireGuard and Traefik example
 ├── coredns/
 │   └── Corefile              # Authoritative internal-zone and forwarding configuration
 ├── data/                     # Persistent state
@@ -107,3 +110,13 @@ edge-gateway-hub/
 * **Authoritative internal zone:** The `coredns` container shares the WireGuard network namespace and is not published on a host DNS port. It is authoritative for `internal`; generated records are stored in `data/dns/hosts`, with `ipam.json` as their source of truth. An Internal Node named `home-server` resolves as `home-server.internal` to its `10.102.x.x` address.
 * **WireGuard clients:** Generated Access Client profiles configure `DNS = <Internal Node Network hub address>`, normally `10.102.0.1`. Their existing route to the Internal Node Network therefore carries DNS queries to the gateway. Internal and Edge Service Peer profiles do not use the gateway DNS unless their operators configure it explicitly.
 * **Public names:** Queries outside `internal`, including public domains used by Edge Service Peers, are forwarded by CoreDNS to its configured upstream resolver. Public internet clients resolve Edge Service Peer domains through normal public DNS, which must publish A/AAAA records pointing to the gateway's public IP; Nginx then selects the private backend by SNI.
+
+### E. Internal and Edge Node Compose Example
+
+* `examples/node/docker-compose.yml` provides a minimal deployment for either
+  an Internal Node or an Edge Service Peer. The operator copies the generated
+  peer profile to `./wireguard/wg_confs/wg0.conf`.
+* The Traefik container shares the WireGuard container's network namespace,
+  allowing the gateway to reach Traefik on the node's WireGuard address without
+  exposing ports on the node host. Traefik provides HTTP (`80`) and HTTPS
+  (`443`) entrypoints and Docker service discovery for basic container routing.

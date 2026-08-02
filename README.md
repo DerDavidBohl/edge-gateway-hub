@@ -159,6 +159,25 @@ ports:
   - "2222:2222"   # SSH jump host, for example
 ```
 
+## Running Traefik on an Internal or Edge Node
+
+[`examples/node/docker-compose.yml`](examples/node/docker-compose.yml) is a
+minimal node-side stack for either peer type. Create the peer first, then copy
+its generated profile into the example directory before starting it:
+
+```bash
+mkdir -p node/wireguard/wg_confs
+cp data/keys/webserver/webserver.conf node/wireguard/wg_confs/wg0.conf
+cd node
+docker compose up -d
+```
+
+Traefik shares WireGuard's network namespace and listens on ports `80` and
+`443` of the node's WireGuard address; it does not publish ports on the node
+host. Its Docker provider is enabled with `exposedByDefault=false`, so
+application containers must opt in with Traefik labels and join the
+`node-proxy` network.
+
 ## License
 
 MIT
