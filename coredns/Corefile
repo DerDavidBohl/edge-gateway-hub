@@ -1,0 +1,11 @@
+internal:53 {
+    hosts /etc/coredns/hosts
+    errors
+    health
+}
+
+.:53 {
+    errors
+    health
+    forward . /etc/resolv.conf
+}

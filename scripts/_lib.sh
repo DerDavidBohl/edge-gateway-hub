@@ -19,6 +19,8 @@ WG_PEERS_DIR="$WG_DIR/peers"
 WG_CONFS_DIR="$WG_DIR/wg_confs"
 WG_CONF="$WG_CONFS_DIR/wg0.conf"
 NGINX_STREAM_DIR="$DATA_DIR/nginx"
+DNS_DIR="$DATA_DIR/dns"
+DNS_HOSTS_FILE="$DNS_DIR/hosts"
 
 # ─── Prerequisite checks ──────────────────────────────────────────────────────
 
@@ -145,6 +147,26 @@ get_next_ip() {
 
     echo "Error: Subnet $subnet is full (no IPs available from .2 to .254)." >&2
     return 1
+}
+
+# Return the first host IP in a /24 CIDR.
+hub_ip() {
+    local subnet="$1"
+    local network="${subnet%/*}"
+    printf '%s.1\n' "${network%.*}"
+}
+
+# Rebuild authoritative internal DNS records from Internal Node allocations.
+rebuild_dns_hosts() {
+    require_ipam
+    mkdir -p "$DNS_DIR"
+
+    jq -r '.peers | to_entries[]
+           | select(.value.type == "internal")
+           | "\(.value.ip) \(.key).internal"' \
+        "$IPAM_FILE" > "${DNS_HOSTS_FILE}.tmp"
+    mv "${DNS_HOSTS_FILE}.tmp" "$DNS_HOSTS_FILE"
+    chmod 644 "$DNS_HOSTS_FILE"
 }
 
 # ─── WireGuard config management ──────────────────────────────────────────────

@@ -40,6 +40,7 @@ echo "Removing peer '$NAME'..."
 
 jq --arg name "$NAME" 'del(.peers[$name])' "$IPAM_FILE" > "${IPAM_FILE}.tmp"
 mv "${IPAM_FILE}.tmp" "$IPAM_FILE"
+rebuild_dns_hosts
 
 # ─── Remove from WireGuard server config and hot-reload ──────────────────────
 

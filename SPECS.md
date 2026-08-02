@@ -2,10 +2,11 @@
 
 ## 1. Architecture & Core Features
 
-* **100% Containerized Stack:** All services (Nginx and WireGuard) run isolated as Docker containers on a public-facing host (Edge Gateway).
+* **100% Containerized Stack:** All services (Nginx, WireGuard, and CoreDNS) run isolated as Docker containers on a public-facing host (Edge Gateway).
 * **Nginx Stream Module (TCP SNI Passthrough & UDP Support):** Nginx operates at Layer 4 (Transport layer) using the Stream module. Domain-based routing is handled via TCP SNI passthrough (`ssl_preread`), keeping certificate management and TLS termination completely on the destination sites. Additionally, native UDP routing is supported for port-based services.
 * **Isolated Network Routing:** Routing is handled independently within container and WireGuard interfaces, requiring no host firewall modifications.
 * **State & Key Management:** All cryptographic keys, IP allocations, and routing configurations are persistently stored locally in the `./data/` directory on the gateway host.
+* **Internal DNS:** CoreDNS is an authoritative resolver for the `internal` zone. It serves automatically generated `internal`-node records from the gateway and forwards all other names to the resolver configured in its container.
 
 ---
 
@@ -19,6 +20,7 @@
 * **Edge Service Peers:** Peers hosting public services (TCP/UDP) exposed via the Edge Proxy.
 * **IP Address Management (IPAM):** The structured assignment and tracking of internal IP addresses via a local state file (`ipam.json`).
 * **Site:** A specific application on an Edge Service Peer reachable via a public domain or fixed port.
+* **Internal DNS Record:** An automatically generated `<internal-peer-name>.internal` A record mapped to an Internal Node's WireGuard address.
 
 ---
 
@@ -43,8 +45,12 @@ Traffic is strictly separated into three isolated subnets:
 ```text
 edge-gateway-hub/
 ├── .env.example              # Configuration template (Public IP, subnets, ports)
-├── docker-compose.yml        # Orchestration for Nginx and WireGuard
+├── docker-compose.yml        # Orchestration for Nginx, WireGuard, and CoreDNS
+├── coredns/
+│   └── Corefile              # Authoritative internal-zone and forwarding configuration
 ├── data/                     # Persistent state
+│   ├── dns/
+│   │   └── hosts             # Generated Internal Node hostname-to-IP records
 │   ├── ipam.json             # Structured IP and type management
 │   ├── keys/                 # Automatically generated keys & client configuration files
 │   └── nginx/                # Dynamically generated Nginx stream configurations
@@ -72,6 +78,7 @@ edge-gateway-hub/
 * Validates that `WG_PORT` is within `1-65535` and that all three zone subnets are IPv4 `/24` CIDRs before generating configuration.
 * Creates the `.env` file and the directory structure for persistent state (`data/`).
 * Starts the container stack via Docker Compose.
+* Creates the DNS record directory and generates its initial empty hosts file.
 
 ### B. Peer & Client Management (`scripts/peer/`)
 * **`add.sh <name> <type>`** (where `<type>` accepts `client`, `internal`, or `edge`):
@@ -79,8 +86,9 @@ edge-gateway-hub/
   * Generates a local WireGuard key pair and saves it under `data/keys/<name>/`.
   * **Automatically generates a complete WireGuard configuration file (`data/keys/<name>/<name>.conf`)** containing all necessary parameters (client/peer private key, assigned IP, public gateway endpoint, server public key, type-specific `AllowedIPs`, and keepalive settings).
   * Adds the peer to the server configuration and performs a hot reload of the WireGuard container.
+  * Regenerates the CoreDNS hosts file; each Internal Node receives `<name>.internal` mapped to its allocated Internal Node Network address.
 * **`remove.sh <name>`:**
-  * Removes the peer from the server configuration, releases the IP in IPAM, and cleans up keys and generated configuration files.
+  * Removes the peer from the server configuration, releases the IP in IPAM, cleans up keys and generated configuration files, and regenerates DNS records.
 * **`list.sh`:**
   * Outputs a tabular overview of all registered peers, their zones, and IP addresses.
 
@@ -93,3 +101,9 @@ edge-gateway-hub/
   * Removes the corresponding routing block and updates the proxy.
 * **`list.sh`:**
   * Displays all active forwards.
+
+### D. DNS Resolution
+
+* **Authoritative internal zone:** The `coredns` container shares the WireGuard network namespace and is not published on a host DNS port. It is authoritative for `internal`; generated records are stored in `data/dns/hosts`, with `ipam.json` as their source of truth. An Internal Node named `home-server` resolves as `home-server.internal` to its `10.102.x.x` address.
+* **WireGuard clients:** Generated Access Client profiles configure `DNS = <Internal Node Network hub address>`, normally `10.102.0.1`. Their existing route to the Internal Node Network therefore carries DNS queries to the gateway. Internal and Edge Service Peer profiles do not use the gateway DNS unless their operators configure it explicitly.
+* **Public names:** Queries outside `internal`, including public domains used by Edge Service Peers, are forwarded by CoreDNS to its configured upstream resolver. Public internet clients resolve Edge Service Peer domains through normal public DNS, which must publish A/AAAA records pointing to the gateway's public IP; Nginx then selects the private backend by SNI.

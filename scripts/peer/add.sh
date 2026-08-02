@@ -74,6 +74,7 @@ SERVER_PUBLIC_KEY="$(cat "$WG_DIR/server_public.key")"
 
 CLIENT_SUBNET="$(jq   -r '.subnets.client'   "$IPAM_FILE")"
 INTERNAL_SUBNET="$(jq -r '.subnets.internal' "$IPAM_FILE")"
+INTERNAL_DNS_IP="$(hub_ip "$INTERNAL_SUBNET")"
 
 # ─── Determine type-specific AllowedIPs for client config ────────────────────
 # These are the IPs the peer should route through the WireGuard tunnel.
@@ -85,7 +86,7 @@ INTERNAL_SUBNET="$(jq -r '.subnets.internal' "$IPAM_FILE")"
 case "$TYPE" in
     client)
         ALLOWED_IPS="$INTERNAL_SUBNET"
-        INTERFACE_EXTRAS="DNS = 1.1.1.1"
+        INTERFACE_EXTRAS="DNS = $INTERNAL_DNS_IP"
         ;;
     internal)
         ALLOWED_IPS="$CLIENT_SUBNET"
@@ -124,6 +125,7 @@ jq --arg name "$NAME" \
    '.peers[$name] = {type: $type, ip: $ip, public_key: $pub}' \
    "$IPAM_FILE" > "${IPAM_FILE}.tmp"
 mv "${IPAM_FILE}.tmp" "$IPAM_FILE"
+rebuild_dns_hosts
 
 # ─── Update WireGuard server config and hot-reload ───────────────────────────
 

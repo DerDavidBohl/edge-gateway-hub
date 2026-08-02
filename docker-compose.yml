@@ -5,8 +5,8 @@ version: "3.8"
 # Architecture:
 #   wireguard  – WireGuard VPN hub; also owns the exposed host ports so that
 #                nginx (which shares its network namespace) can bind to them.
-#   nginx      – Layer-4 stream proxy; uses network_mode: service:wireguard so
-#                it can reach WireGuard peer IPs via the wg0 interface.
+#   nginx      – Layer-4 stream proxy; shares the WireGuard network namespace.
+#   coredns    – Authoritative resolver for Internal Node WireGuard hostnames.
 
 services:
   wireguard:
@@ -36,6 +36,18 @@ services:
     volumes:
       - ./nginx.conf:/etc/nginx/nginx.conf:ro
       - ./data/nginx:/etc/nginx/stream.d:ro
+    depends_on:
+      - wireguard
+    restart: unless-stopped
+
+  coredns:
+    image: coredns/coredns:1.12.1
+    container_name: coredns
+    network_mode: "service:wireguard"
+    command: -conf /etc/coredns/Corefile
+    volumes:
+      - ./coredns/Corefile:/etc/coredns/Corefile:ro
+      - ./data/dns/hosts:/etc/coredns/hosts:ro
     depends_on:
       - wireguard
     restart: unless-stopped

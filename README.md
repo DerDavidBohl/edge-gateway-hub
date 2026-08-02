@@ -79,6 +79,15 @@ bash scripts/peer/add.sh webserver edge
 
 The generated `data/keys/<name>/<name>.conf` is a ready-to-use WireGuard client config. Send it to the peer operator.
 
+Access Client profiles use the gateway's Internal Node Network address as their
+DNS server. An Internal Node named `homeserver` is therefore reachable at both
+`10.102.0.2` and `homeserver.internal`. DNS records are derived automatically
+from `data/ipam.json` and written to `data/dns/hosts`.
+
+Public domains for Edge Service Peers remain normal public-DNS records: point
+their A/AAAA records at the gateway's public IP, then configure SNI routing
+with `scripts/site/add.sh`.
+
 ### 3. Expose a service
 
 ```bash
@@ -115,6 +124,8 @@ bash scripts/site/add.sh 53 10.103.0.2 53 udp
 ```
 data/
 ├── ipam.json               # IP allocations and peer registry
+├── dns/
+│   └── hosts                # Generated <internal-node>.internal records
 ├── sites.json              # Nginx routing rules
 ├── wireguard/
 │   ├── server_private.key  # ⚠ secret – never commit

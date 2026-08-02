@@ -125,8 +125,11 @@ mkdir -p \
     "$DATA_DIR/wireguard/wg_confs" \
     "$DATA_DIR/wireguard/peers" \
     "$DATA_DIR/keys" \
-    "$DATA_DIR/nginx"
+    "$DATA_DIR/nginx" \
+    "$DATA_DIR/dns"
 chmod 700 "$DATA_DIR/wireguard"
+touch "$DATA_DIR/dns/hosts"
+chmod 644 "$DATA_DIR/dns/hosts"
 ok "Directory structure ready."
 
 # ─── Server WireGuard key pair ─────────────────────────────────────────────────
