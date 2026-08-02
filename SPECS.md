@@ -92,11 +92,14 @@ edge-gateway-hub/
   * Regenerates the CoreDNS hosts file; each Internal Node receives `<name>.internal` mapped to its allocated Internal Node Network address.
 * **`remove.sh <name>`:**
   * Removes the peer from the server configuration, releases the IP in IPAM, cleans up keys and generated configuration files, and regenerates DNS records.
+  * Refuses to remove an Edge Service Peer while site routing rules reference its name.
 * **`list.sh`:**
   * Outputs a tabular overview of all registered peers, their zones, and IP addresses.
 
 ### C. Site & Domain Routing (`scripts/site/`)
-* **`add.sh <domain-or-port> <target-ip> <target-port> [protocol]`:**
+* **`add.sh <domain-or-port> <target-peer-name> <target-port> [protocol]`:**
+  * Resolves the named Edge Service Peer from IPAM and rejects unknown or non-edge peers.
+  * Stores the peer name in the site definition and resolves its current WireGuard address when generating Nginx configuration.
   * Creates a new TCP SNI routing block (or UDP stream block) in the Nginx stream configuration.
   * Validates `target-port` (and source port for port-based routes) as valid TCP/UDP ports in the range `1-65535`.
   * Performs a zero-downtime reload (`nginx -s reload`) of the proxy container.

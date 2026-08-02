@@ -56,6 +56,23 @@ require_sites() {
     }
 }
 
+# Return the WireGuard address for a registered Edge Service Peer.
+edge_peer_ip() {
+    local name="$1"
+    require_ipam
+
+    local ip
+    ip="$(jq -r --arg name "$name" \
+        '.peers[$name] | select(.type == "edge") | .ip // empty' "$IPAM_FILE")"
+
+    [[ -n "$ip" ]] || {
+        echo "Error: Edge Service Peer '$name' was not found in IPAM." >&2
+        return 1
+    }
+
+    printf '%s\n' "$ip"
+}
+
 # ─── WireGuard key generation ─────────────────────────────────────────────────
 
 # Generate a WireGuard private key using the best available method:
@@ -220,10 +237,17 @@ rebuild_nginx_configs() {
     if [[ "$domain_count" -gt 0 ]]; then
         {
             printf 'map $ssl_preread_server_name $tcp_sni_backend {\n'
-            jq -r '.sites | to_entries[]
-                   | select(.value.type == "domain")
-                   | "    \(.key) \(.value.target_ip):\(.value.target_port);"' \
-                "$SITES_FILE"
+            while IFS=$'\t' read -r key target_peer target_port; do
+                local target_ip
+                target_ip="$(edge_peer_ip "$target_peer")" || {
+                    echo "Error: Site '$key' references unavailable Edge Service Peer '$target_peer'." >&2
+                    return 1
+                }
+                printf '    %s %s:%s;\n' "$key" "$target_ip" "$target_port"
+            done < <(jq -r '.sites | to_entries[]
+                           | select(.value.type == "domain")
+                           | [.key, .value.target_peer, (.value.target_port | tostring)]
+                           | @tsv' "$SITES_FILE")
             printf '    default 127.0.0.1:9;\n'
             printf '}\n\n'
             printf 'server {\n'
@@ -235,7 +259,12 @@ rebuild_nginx_configs() {
     fi
 
     # ── Port-based server blocks (TCP or UDP) ─────────────────────────────────
-    while IFS=$'\t' read -r _key source_port target_ip target_port protocol; do
+    while IFS=$'\t' read -r key source_port target_peer target_port protocol; do
+        local target_ip
+        target_ip="$(edge_peer_ip "$target_peer")" || {
+            echo "Error: Site '$key' references unavailable Edge Service Peer '$target_peer'." >&2
+            return 1
+        }
         {
             printf 'server {\n'
             if [[ "$protocol" == "udp" ]]; then
@@ -250,7 +279,7 @@ rebuild_nginx_configs() {
                     | select(.value.type == "port")
                     | [.key,
                        (.value.source_port | tostring),
-                       .value.target_ip,
+                       .value.target_peer,
                        (.value.target_port | tostring),
                        .value.protocol]
                     | @tsv' "$SITES_FILE")

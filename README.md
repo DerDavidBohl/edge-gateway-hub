@@ -92,13 +92,13 @@ with `scripts/site/add.sh`.
 
 ```bash
 # SNI passthrough for a domain (HTTPS port 443)
-bash scripts/site/add.sh example.com 10.103.0.2 443
+bash scripts/site/add.sh example.com services01 443
 
 # Port-based TCP forwarding
-bash scripts/site/add.sh 8080 10.103.0.3 8080 tcp
+bash scripts/site/add.sh 8080 services01 8080 tcp
 
 # UDP forwarding (e.g. DNS)
-bash scripts/site/add.sh 53 10.103.0.2 53 udp
+bash scripts/site/add.sh 53 services01 53 udp
 ```
 
 ## Script Reference
@@ -115,7 +115,7 @@ bash scripts/site/add.sh 53 10.103.0.2 53 udp
 
 | Script | Description |
 |--------|-------------|
-| `add.sh <domain\|port> <target-ip> <target-port> [protocol]` | Add SNI or port-based routing, reload Nginx |
+| `add.sh <domain\|port> <target-peer-name> <target-port> [protocol]` | Add SNI or port-based routing to an Edge Service Peer, reload Nginx |
 | `remove.sh <domain\|port>` | Remove routing rule, reload Nginx |
 | `list.sh` | Tabular overview of all active forwarding rules |
 

@@ -34,6 +34,20 @@ jq -e --arg n "$NAME" '.peers | has($n)' "$IPAM_FILE" &>/dev/null || {
     exit 1
 }
 
+PEER_TYPE="$(jq -r --arg n "$NAME" '.peers[$n].type' "$IPAM_FILE")"
+if [[ "$PEER_TYPE" == "edge" ]]; then
+    require_sites
+    site_keys="$(jq -r --arg name "$NAME" \
+        '.sites | to_entries[]
+         | select(.value.target_peer == $name)
+         | .key' "$SITES_FILE")"
+    [[ -z "$site_keys" ]] || {
+        echo "Error: Edge Service Peer '$NAME' is used by site(s): $(paste -sd ', ' <<< "$site_keys")." >&2
+        echo "Remove those site routes before removing the peer." >&2
+        exit 1
+    }
+fi
+
 # ─── Remove from IPAM ─────────────────────────────────────────────────────────
 
 echo "Removing peer '$NAME'..."
