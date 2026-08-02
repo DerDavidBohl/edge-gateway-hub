@@ -120,3 +120,6 @@ edge-gateway-hub/
   allowing the gateway to reach Traefik on the node's WireGuard address without
   exposing ports on the node host. Traefik provides HTTP (`80`) and HTTPS
   (`443`) entrypoints and Docker service discovery for basic container routing.
+* The example includes an opt-in `traefik/whoami` service on the `node-proxy`
+  network. It demonstrates a Docker-label router for HTTP requests with the
+  `Host` value `whoami.example.com`.

@@ -176,7 +176,12 @@ Traefik shares WireGuard's network namespace and listens on ports `80` and
 `443` of the node's WireGuard address; it does not publish ports on the node
 host. Its Docker provider is enabled with `exposedByDefault=false`, so
 application containers must opt in with Traefik labels and join the
-`node-proxy` network.
+`node-proxy` network. The bundled `whoami` service demonstrates this at
+`whoami.example.com` over HTTP. Test it through the node's WireGuard address:
+
+```bash
+curl --header 'Host: whoami.example.com' http://<node-wireguard-ip>/
+```
 
 ## License
 

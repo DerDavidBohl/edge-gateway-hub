@@ -35,6 +35,18 @@ services:
       - wireguard
     restart: unless-stopped
 
+  whoami:
+    image: traefik/whoami:v1.10
+    container_name: node-whoami
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.whoami.rule=Host(`whoami.example.com`)
+      - traefik.http.routers.whoami.entrypoints=web
+      - traefik.http.services.whoami.loadbalancer.server.port=80
+    networks:
+      - proxy
+    restart: unless-stopped
+
 networks:
   proxy:
     name: node-proxy
