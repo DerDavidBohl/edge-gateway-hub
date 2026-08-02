@@ -16,8 +16,8 @@ services:
       - NET_ADMIN
       - SYS_MODULE
     environment:
-      - PUID=0
-      - PGID=0
+      - PUID=1000
+      - PGID=1000
     volumes:
       - ./data/wireguard:/config
     ports:
