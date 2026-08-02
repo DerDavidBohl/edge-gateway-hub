@@ -46,6 +46,7 @@ mv "${SITES_FILE}.tmp" "$SITES_FILE"
 
 rebuild_nginx_configs
 rebuild_dns_hosts
+rebuild_dns_wildcards
 reload_nginx
 reload_coredns
 

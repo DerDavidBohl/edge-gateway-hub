@@ -102,7 +102,7 @@ edge-gateway-hub/
   * Stores the peer name in the site definition and resolves its current WireGuard address when generating Nginx configuration.
   * Creates a new TCP SNI routing block (or UDP stream block) in the Nginx stream configuration. Domain routes support exact hostnames and leading-wildcard hostnames (for example, `*.media.example.com`); exact and more-specific wildcard routes take precedence.
   * Wildcard routes require matching public wildcard DNS records (for example, `*.media.example.com`) that point to the gateway. They do not match the parent domain, which must be added separately when needed.
-  * Private domain routes are served by CoreDNS only to WireGuard clients and resolve directly to the Internal Node address. They may deliberately override a public DNS name for those clients; the service port is selected by the client or a reverse proxy on the Internal Node.
+  * Private domain routes are served by CoreDNS only to WireGuard clients and resolve directly to the Internal Node address. They may deliberately override a public DNS name for those clients; the service port is selected by the client or a reverse proxy on the Internal Node. Private domains support leading-wildcard hostnames (for example, `*.home.example`), which match subdomains but not the parent domain. Exact private records take precedence over wildcard records, and more-specific wildcard records take precedence over less-specific ones.
   * Validates `target-port` (and source port for port-based routes) as valid TCP/UDP ports in the range `1-65535`.
   * Performs a zero-downtime reload (`nginx -s reload`) for public routes, or restarts CoreDNS for private DNS changes.
 * **`remove.sh <domain-or-port>`:**
@@ -112,7 +112,7 @@ edge-gateway-hub/
 
 ### D. DNS Resolution
 
-* **Private DNS:** The `coredns` container shares the WireGuard network namespace and is not published on a host DNS port. Generated records are stored in `data/dns/hosts`, with `ipam.json` and private site definitions as their source of truth. An Internal Node named `home-server` resolves as `home-server.internal` to its `10.102.x.x` address, and a configured private domain resolves directly to its assigned address.
+* **Private DNS:** The `coredns` container shares the WireGuard network namespace and is not published on a host DNS port. Generated exact records are stored in `data/dns/hosts` and `data/dns/exact.conf`, and generated wildcard rules are stored in `data/dns/wildcards.conf`; `ipam.json` and private site definitions are their source of truth. An Internal Node named `home-server` resolves as `home-server.internal` to its `10.102.x.x`, and configured exact or wildcard private domains resolve directly to their assigned address.
 * **WireGuard clients:** Generated Access Client profiles configure `DNS = <Internal Node Network hub address>`, normally `10.102.0.1`. Their existing route to the Internal Node Network therefore carries DNS queries to the gateway. Internal and Edge Service Peer profiles do not use the gateway DNS unless their operators configure it explicitly.
 * **Public names:** Queries outside `internal`, including public domains used by Edge Service Peers, are forwarded by CoreDNS to its configured upstream resolver. Public internet clients resolve Edge Service Peer domains through normal public DNS, which must publish A/AAAA records pointing to the gateway's public IP; Nginx then selects the private backend by SNI.
 

@@ -100,11 +100,11 @@ else
             echo "Error: Internal Node domains do not accept a target-port or protocol." >&2
             exit 1
         }
-        [[ "$KEY" != \*.* ]] || {
-            echo "Error: Wildcard domains are not supported for Internal Node DNS records." >&2
-            exit 1
-        }
-        SITE_TYPE="internal-domain"
+        if [[ "$KEY" == \*.* ]]; then
+            SITE_TYPE="internal-wildcard-domain"
+        else
+            SITE_TYPE="internal-domain"
+        fi
         TARGET_PORT=""
         SOURCE_PORT=""
         PROTOCOL="dns"
@@ -126,7 +126,7 @@ else
     fi
 fi
 
-if [[ "$SITE_TYPE" == "internal-domain" ]]; then
+if [[ "$SITE_TYPE" == internal-* ]]; then
     echo "Adding private DNS record '$KEY' → $TARGET_PEER ($TARGET_IP)..."
 else
     echo "Adding site '$KEY' ($SITE_TYPE) → $TARGET_PEER ($TARGET_IP):$TARGET_PORT ($PROTOCOL)..."
@@ -134,7 +134,7 @@ fi
 
 # ─── Update sites.json ────────────────────────────────────────────────────────
 
-if [[ "$SITE_TYPE" == "internal-domain" ]]; then
+if [[ "$SITE_TYPE" == internal-* ]]; then
     jq --arg key "$KEY" \
        --arg type "$SITE_TYPE" \
        --arg target_peer "$TARGET_PEER" \
@@ -166,7 +166,8 @@ mv "${SITES_FILE}.tmp" "$SITES_FILE"
 
 rebuild_nginx_configs
 rebuild_dns_hosts
-if [[ "$SITE_TYPE" == "internal-domain" ]]; then
+rebuild_dns_wildcards
+if [[ "$SITE_TYPE" == internal-* ]]; then
     reload_coredns
 else
     reload_nginx
@@ -177,7 +178,7 @@ fi
 echo ""
 echo "✓ Site '$KEY' added successfully."
 echo ""
-if [[ "$SITE_TYPE" == "internal-domain" ]]; then
+if [[ "$SITE_TYPE" == internal-* ]]; then
     printf '  Private DNS:          %-20s → %s\n' "$KEY" "$TARGET_PEER ($TARGET_IP)"
 elif [[ "$SITE_TYPE" == "domain" ]]; then
     printf '  TCP SNI passthrough: HTTPS for %-20s → %s:%s\n' \

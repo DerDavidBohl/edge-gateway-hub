@@ -1,5 +1,7 @@
 .:53 {
-    hosts /etc/coredns/hosts {
+    import /etc/coredns/generated/exact*.conf
+    import /etc/coredns/generated/wildcards*.conf
+    hosts /etc/coredns/generated/hosts {
         fallthrough
     }
     errors

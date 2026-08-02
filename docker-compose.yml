@@ -47,7 +47,7 @@ services:
     command: -conf /etc/coredns/Corefile
     volumes:
       - ./coredns/Corefile:/etc/coredns/Corefile:ro
-      - ./data/dns/hosts:/etc/coredns/hosts:ro
+      - ./data/dns:/etc/coredns/generated:ro
     depends_on:
       - wireguard
     restart: unless-stopped

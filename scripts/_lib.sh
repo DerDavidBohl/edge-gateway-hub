@@ -21,6 +21,8 @@ WG_CONF="$WG_CONFS_DIR/wg0.conf"
 NGINX_STREAM_DIR="$DATA_DIR/nginx"
 DNS_DIR="$DATA_DIR/dns"
 DNS_HOSTS_FILE="$DNS_DIR/hosts"
+DNS_EXACT_FILE="$DNS_DIR/exact.conf"
+DNS_WILDCARDS_FILE="$DNS_DIR/wildcards.conf"
 
 # ─── Prerequisite checks ──────────────────────────────────────────────────────
 
@@ -202,7 +204,7 @@ hub_ip() {
     printf '%s.1\n' "${network%.*}"
 }
 
-# Rebuild private DNS records from Internal Node allocations and site aliases.
+# Rebuild exact private DNS records from Internal Node allocations and site aliases.
 rebuild_dns_hosts() {
     require_ipam
     require_sites
@@ -226,6 +228,64 @@ rebuild_dns_hosts() {
     } > "${DNS_HOSTS_FILE}.tmp"
     mv "${DNS_HOSTS_FILE}.tmp" "$DNS_HOSTS_FILE"
     chmod 644 "$DNS_HOSTS_FILE"
+
+    {
+        printf '# Generated private exact DNS rules; do not edit.\n'
+        while IFS=' ' read -r ip domain; do
+            local escaped_domain="${domain//./\\.}"
+            cat <<EOF
+template IN A {
+    match ^${escaped_domain}\\.\$
+    answer "{{ .Name }} 60 IN A ${ip}"
+    fallthrough
+}
+EOF
+        done < "$DNS_HOSTS_FILE"
+    } > "${DNS_EXACT_FILE}.tmp"
+    mv "${DNS_EXACT_FILE}.tmp" "$DNS_EXACT_FILE"
+    chmod 644 "$DNS_EXACT_FILE"
+}
+
+# Rebuild CoreDNS template rules for private wildcard domains. More-specific
+# suffixes are emitted first so they take precedence over broader wildcards.
+rebuild_dns_wildcards() {
+    require_ipam
+    require_sites
+    mkdir -p "$DNS_DIR"
+
+    {
+        printf '# Generated private wildcard DNS rules; do not edit.\n'
+        while IFS=$'\t' read -r domain ip; do
+            local escaped_domain="${domain//./\\.}"
+            cat <<EOF
+template IN A {
+    match ^([^.]+\\.)+${escaped_domain}\\.\$
+    answer "{{ .Name }} 60 IN A ${ip}"
+    fallthrough
+}
+EOF
+        done < <(
+            jq -r --slurpfile sites "$SITES_FILE" '
+                . as $ipam
+                | [$sites[0].sites
+                   | to_entries[]
+                   | select(.value.type == "internal-wildcard-domain")
+                   | {
+                       domain: (.key | ltrimstr("*.")),
+                       target_peer: .value.target_peer
+                     }]
+                | sort_by(.domain | split(".") | length)
+                | reverse[]
+                | . as $site
+                | $ipam.peers[$site.target_peer]
+                | select(.type == "internal")
+                | [$site.domain, .ip]
+                | @tsv
+            ' "$IPAM_FILE"
+        )
+    } > "${DNS_WILDCARDS_FILE}.tmp"
+    mv "${DNS_WILDCARDS_FILE}.tmp" "$DNS_WILDCARDS_FILE"
+    chmod 644 "$DNS_WILDCARDS_FILE"
 }
 
 # ─── WireGuard config management ──────────────────────────────────────────────

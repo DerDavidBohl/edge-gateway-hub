@@ -130,6 +130,10 @@ mkdir -p \
 chmod 700 "$DATA_DIR/wireguard"
 touch "$DATA_DIR/dns/hosts"
 chmod 644 "$DATA_DIR/dns/hosts"
+touch "$DATA_DIR/dns/exact.conf"
+chmod 644 "$DATA_DIR/dns/exact.conf"
+touch "$DATA_DIR/dns/wildcards.conf"
+chmod 644 "$DATA_DIR/dns/wildcards.conf"
 ok "Directory structure ready."
 
 # ─── Server WireGuard key pair ─────────────────────────────────────────────────

@@ -90,17 +90,22 @@ Public domains for Edge Service Peers remain normal public-DNS records: point
 their A/AAAA records at the gateway's public IP, then configure SNI routing
 with `scripts/site/add.sh`.
 
-For subdomain routing, add an explicit wildcard route such as
-`*.media.example.com`. It matches `myservice.media.example.com`, but not
-`media.example.com`; add that parent domain separately if needed. Create a
-public `*.media.example.com` DNS record pointing to the gateway. Exact domain
-routes and more-specific wildcard routes take precedence.
+Private and public domain routes support leading wildcards. A private wildcard
+such as `*.media.home.arpa` resolves matching WireGuard-client queries directly
+to its Internal Node. A public wildcard such as `*.media.example.com` routes
+matching TLS SNI traffic through the gateway. Wildcards do not match their
+parent domain, which must be added separately when needed. Exact routes and
+more-specific wildcard routes take precedence. Public wildcard routes also
+require matching public DNS records pointing to the gateway.
 
 ### 3. Expose a service
 
 ```bash
 # Private DNS for an Internal Node; connect directly to its service port
 bash scripts/site/add.sh media.home.arpa homeserver
+
+# Private DNS for all matching subdomains (not media.home.arpa itself)
+bash scripts/site/add.sh '*.media.home.arpa' homeserver
 
 # SNI passthrough for an exact domain (HTTPS port 443)
 bash scripts/site/add.sh example.com services01 443
@@ -139,7 +144,9 @@ bash scripts/site/add.sh 53 services01 53 udp
 data/
 ├── ipam.json               # IP allocations and peer registry
 ├── dns/
-│   └── hosts                # Generated Internal Node names and private domain records
+│   ├── hosts                # Generated exact Internal Node and private domain records
+│   ├── exact.conf           # Generated CoreDNS rules for private exact domains
+│   └── wildcards.conf       # Generated CoreDNS rules for private wildcard domains
 ├── sites.json              # Private DNS aliases and Nginx routing rules
 ├── wireguard/
 │   ├── server_private.key  # ⚠ secret – never commit
