@@ -75,13 +75,15 @@ SERVER_PUBLIC_KEY="$(cat "$WG_DIR/server_public.key")"
 CLIENT_SUBNET="$(jq   -r '.subnets.client'   "$IPAM_FILE")"
 INTERNAL_SUBNET="$(jq -r '.subnets.internal' "$IPAM_FILE")"
 INTERNAL_DNS_IP="$(hub_ip "$INTERNAL_SUBNET")"
+EDGE_SUBNET="$(jq -r '.subnets.edge' "$IPAM_FILE")"
+EDGE_HUB_IP="$(hub_ip "$EDGE_SUBNET")"
 
 # ─── Determine type-specific AllowedIPs for client config ────────────────────
 # These are the IPs the peer should route through the WireGuard tunnel.
 #   client   → reach the internal node network
 #   internal → reach the access client network
-#   edge     → route all traffic through the hub (internet traffic arrives
-#               via the Nginx proxy; responses must go back through the tunnel)
+#   edge     → route only the edge gateway address through the tunnel. Public
+#               traffic arrives through Nginx; VPN Internet egress is denied.
 
 case "$TYPE" in
     client)
@@ -93,7 +95,7 @@ case "$TYPE" in
         INTERFACE_EXTRAS=""
         ;;
     edge)
-        ALLOWED_IPS="0.0.0.0/0"
+        ALLOWED_IPS="${EDGE_HUB_IP}/32"
         INTERFACE_EXTRAS=""
         ;;
 esac

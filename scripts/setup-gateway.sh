@@ -166,8 +166,8 @@ cat > "$DATA_DIR/wireguard/wg_interface.conf" << EOF
 Address = ${CLIENT_HUB_IP}/24,${INTERNAL_HUB_IP}/24,${EDGE_HUB_IP}/24
 ListenPort = ${WG_PORT}
 PrivateKey = ${SERVER_PRIVATE}
-PostUp = iptables -A FORWARD -i wg0 -j ACCEPT; iptables -A FORWARD -o wg0 -j ACCEPT; iptables -t nat -A POSTROUTING -o eth+ -j MASQUERADE
-PostDown = iptables -D FORWARD -i wg0 -j ACCEPT; iptables -D FORWARD -o wg0 -j ACCEPT; iptables -t nat -D POSTROUTING -o eth+ -j MASQUERADE
+PostUp = iptables -N EGHUB_WG_FORWARD; iptables -A EGHUB_WG_FORWARD -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT; iptables -A EGHUB_WG_FORWARD -s ${CLIENT_SUBNET} -d ${INTERNAL_SUBNET} -j ACCEPT; iptables -A EGHUB_WG_FORWARD -j DROP; iptables -I FORWARD -i wg0 -j EGHUB_WG_FORWARD; iptables -I FORWARD -o wg0 -j EGHUB_WG_FORWARD
+PostDown = iptables -D FORWARD -i wg0 -j EGHUB_WG_FORWARD; iptables -D FORWARD -o wg0 -j EGHUB_WG_FORWARD; iptables -F EGHUB_WG_FORWARD; iptables -X EGHUB_WG_FORWARD
 EOF
 chmod 600 "$DATA_DIR/wireguard/wg_interface.conf"
 

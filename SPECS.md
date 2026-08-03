@@ -5,6 +5,10 @@
 * **100% Containerized Stack:** All services (Nginx, WireGuard, and CoreDNS) run isolated as Docker containers on a public-facing host (Edge Gateway).
 * **Nginx Stream Module (TCP SNI Passthrough & UDP Support):** Nginx operates at Layer 4 (Transport layer) using the Stream module. Domain-based routing is handled via TCP SNI passthrough (`ssl_preread`), keeping certificate management and TLS termination completely on the destination sites. Additionally, native UDP routing is supported for port-based services.
 * **Isolated Network Routing:** Routing is handled independently within container and WireGuard interfaces, requiring no host firewall modifications.
+* **Default-Deny Zone Firewall:** The gateway permits only Access Client traffic
+  to Internal Nodes and established return traffic. It blocks lateral traffic,
+  client access to Edge Service Peers, and VPN Internet egress. Public Edge
+  Service traffic reaches peers only through the gateway's Nginx proxy.
 * **State & Key Management:** All cryptographic keys, IP allocations, and routing configurations are persistently stored locally in the `./data/` directory on the gateway host.
 * **Internal DNS:** CoreDNS is an authoritative resolver for the `internal` zone. It serves automatically generated `internal`-node records from the gateway and forwards all other names to the resolver configured in its container.
 
@@ -31,12 +35,18 @@ Traffic is strictly separated into three isolated subnets:
 1. **Access Client Network (e.g., `10.101.0.0/24`):**
    * For road warriors and administrators.
    * Grants access to *Internal Nodes*.
+   * Cannot access other clients, Edge Service Peers, or the Internet through
+     the gateway.
 2. **Internal Node Network (e.g., `10.102.0.0/24`):**
    * For private home servers and containers.
    * Only internally accessible to Access Clients.
+   * May return established Access Client connections but cannot initiate
+     connections to clients through the gateway.
 3. **Edge Service Network (e.g., `10.103.0.0/24`):**
    * For publicly accessible services (Web/TCP or UDP).
    * The Nginx proxy routes external traffic directly to these peers.
+   * Is isolated from Access Clients and has no Internet egress through the
+     gateway.
 
 ---
 
@@ -80,6 +90,8 @@ edge-gateway-hub/
 * Interactively prompts for basic parameters (Public Gateway IP, subnets for the three zones, UDP ports).
 * Validates that `WG_PORT` is within `1-65535` and that all three zone subnets are IPv4 `/24` CIDRs before generating configuration.
 * Creates the `.env` file and the directory structure for persistent state (`data/`).
+* Installs a default-deny WireGuard forwarding policy that permits only Access
+  Client-to-Internal Node connections and established return traffic.
 * Starts the container stack via Docker Compose.
 * Creates the DNS record directory and generates its initial empty hosts file.
 
@@ -87,7 +99,7 @@ edge-gateway-hub/
 * **`add.sh <name> <type>`** (where `<type>` accepts `client`, `internal`, or `edge`):
   * Checks `ipam.json` and determines the next available IP in the corresponding subnet.
   * Generates a local WireGuard key pair and saves it under `data/keys/<name>/`.
-  * **Automatically generates a complete WireGuard configuration file (`data/keys/<name>/<name>.conf`)** containing all necessary parameters (client/peer private key, assigned IP, public gateway endpoint, server public key, type-specific `AllowedIPs`, and keepalive settings).
+  * **Automatically generates a complete WireGuard configuration file (`data/keys/<name>/<name>.conf`)** containing all necessary parameters (client/peer private key, assigned IP, public gateway endpoint, server public key, type-specific `AllowedIPs`, and keepalive settings). Edge Service Peer profiles route only the gateway's Edge Service address through the tunnel; they do not use the gateway for Internet egress.
   * Adds the peer to the server configuration and performs a hot reload of the WireGuard container.
   * Regenerates the CoreDNS hosts file and reloads CoreDNS; each Internal Node receives `<name>.internal` mapped to its allocated Internal Node Network address.
 * **`remove.sh <name>`:**

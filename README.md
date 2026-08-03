@@ -34,6 +34,12 @@ Nginx runs in the WireGuard container's network namespace so it can reach peer I
 | **internal** | `10.102.0.0/24` | Private home servers, NAS (reachable only by clients) |
 | **edge** | `10.103.0.0/24` | Peers hosting public services routed by Nginx |
 
+The gateway uses default-deny forwarding between these zones: Access Clients
+may initiate connections to Internal Nodes, while established replies are
+allowed. Client-to-client, client-to-edge, client-to-Internet, and edge
+Internet-egress traffic are blocked. Nginx continues to reach Edge Service
+Peers directly from the gateway network namespace.
+
 ## Prerequisites
 
 | Tool | Purpose |
@@ -78,6 +84,25 @@ bash scripts/peer/add.sh webserver edge
 ```
 
 The generated `data/keys/<name>/<name>.conf` is a ready-to-use WireGuard client config. Send it to the peer operator.
+
+Edge Service Peer profiles route only the gateway's Edge Service address. They
+must not be used as an Internet VPN exit. Existing Edge Service Peer profiles
+created before this policy change contain `AllowedIPs = 0.0.0.0/0`; replace
+that value with the gateway Edge Service address plus `/32` (normally
+`10.103.0.1/32`) before re-importing the profile.
+
+### Migrate an existing gateway to zone isolation
+
+After updating the repository, migrate an existing installation with:
+
+```bash
+bash scripts/migrate-zone-firewall.sh
+```
+
+The migration validates managed Edge Service Peer profiles before changing
+anything, replaces their default Internet route with the gateway Edge Service
+address, rebuilds the gateway configuration, and recreates the stack. Copy
+each regenerated Edge Service Peer profile to its peer and re-import it there.
 
 Access Client profiles use the gateway's Internal Node Network address as their
 DNS server. An Internal Node named `homeserver` is therefore reachable at both
