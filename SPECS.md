@@ -111,6 +111,7 @@ edge-gateway-hub/
 ### C. Site & Domain Routing (`scripts/site/`)
 * **`add.sh <domain-or-port> <target-peer-name> [target-port] [protocol]`:**
   * Resolves the named peer from IPAM. Port routes and public domain routes require an Edge Service Peer. A domain targeting an Internal Node creates a private DNS record and does not require a target port.
+  * Multiple distinct public domains may target the same Edge Service Peer. Public domain routes default to backend port `443` when `target-port` is omitted; specify `target-port` to use a different backend port. Port-based routes always require a target port.
   * Stores the peer name in the site definition and resolves its current WireGuard address when generating Nginx configuration.
   * Creates a new TCP SNI routing block (or UDP stream block) in the Nginx stream configuration. Domain routes support exact hostnames and leading-wildcard hostnames (for example, `*.media.example.com`); exact and more-specific wildcard routes take precedence.
   * Wildcard routes require matching public wildcard DNS records (for example, `*.media.example.com`) that point to the gateway. They do not match the parent domain, which must be added separately when needed.

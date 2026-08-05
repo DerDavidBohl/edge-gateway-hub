@@ -136,11 +136,17 @@ bash scripts/site/add.sh media.home.arpa homeserver
 # Private DNS for all matching subdomains (not media.home.arpa itself)
 bash scripts/site/add.sh '*.media.home.arpa' homeserver
 
-# SNI passthrough for an exact domain (HTTPS port 443)
-bash scripts/site/add.sh example.com services01 443
+# SNI passthrough for an exact domain (defaults to HTTPS port 443)
+bash scripts/site/add.sh example.com services01
 
 # SNI passthrough for all subdomains (not example.com itself)
 bash scripts/site/add.sh '*.example.com' services01 443
+
+# Another public domain can use the same Edge Service Peer
+bash scripts/site/add.sh another-example.com services01
+
+# Use a nonstandard backend port when needed
+bash scripts/site/add.sh api.example.com services01 8443
 
 # Port-based TCP forwarding
 bash scripts/site/add.sh 8080 services01 8080 tcp

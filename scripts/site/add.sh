@@ -18,12 +18,13 @@ Usage: $(basename "$0") <domain|port> <target-peer-name> [target-port] [protocol
                 Port number → port-based TCP or UDP forwarding to an Edge Peer
   target-peer-name
                 Name of a registered Internal Node or Edge Service Peer
-  target-port   Required for Edge Service Peers; omitted for Internal Nodes
+  target-port   Backend port for Edge Service Peers; defaults to 443 for
+                domain routes and is required for port-based routes
   protocol      tcp (default) or udp  — only relevant for port-based routing
 
 Examples:
   $(basename "$0") app.home.arpa homeserver
-  $(basename "$0") example.com   webserver 443
+  $(basename "$0") example.com   webserver
   $(basename "$0") '*.example.com' webserver 443
   $(basename "$0") api.foo.bar   webserver 8080
   $(basename "$0") 8080          webserver 8080 tcp
@@ -109,10 +110,7 @@ else
         SOURCE_PORT=""
         PROTOCOL="dns"
     elif [[ "$TARGET_TYPE" == "edge" ]]; then
-        [[ -n "$TARGET_PORT" ]] || {
-            echo "Error: target-port is required for an Edge Service Peer." >&2
-            exit 1
-        }
+        TARGET_PORT="${TARGET_PORT:-443}"
         is_valid_port "$TARGET_PORT" || {
             echo "Error: target-port must be a number in range 1-65535." >&2
             exit 1
