@@ -2,6 +2,10 @@
 
 A fully containerised Layer-4 edge gateway that combines WireGuard (VPN hub) and Nginx (TCP/UDP stream proxy) to route public internet traffic to private backend services—without touching host firewall rules.
 
+## 🤖 AI Assistance Disclaimer
+
+This project was developed with the assistance of [GitHub Copilot](https://github.com/features/copilot). While AI was used to aid in code generation, syntax suggestions, and development efficiency, all code has been reviewed, tested, and validated by human maintainers.
+
 ## Architecture
 
 ```
