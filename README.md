@@ -129,19 +129,6 @@ created before this policy change contain `AllowedIPs = 0.0.0.0/0`; replace
 that value with the gateway Edge Service address plus `/32` (normally
 `10.103.0.1/32`) before re-importing the profile.
 
-### Migrate an existing gateway to zone isolation
-
-After updating the repository, migrate an existing installation with:
-
-```bash
-bash scripts/migrate-zone-firewall.sh
-```
-
-The migration validates managed Edge Service Peer profiles before changing
-anything, replaces their default Internet route with the gateway Edge Service
-address, rebuilds the gateway configuration, and recreates the stack. Copy
-each regenerated Edge Service Peer profile to its peer and re-import it there.
-
 Access Client profiles use the gateway's Internal Node Network address as their
 DNS server. An Internal Node named `homeserver` is therefore reachable at both
 `10.102.0.2` and `homeserver.internal`. DNS records are derived automatically
