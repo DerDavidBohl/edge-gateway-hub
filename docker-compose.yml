@@ -1,4 +1,3 @@
-version: "3.8"
 
 # edge-gateway-hub – Docker Compose stack
 #
@@ -41,7 +40,7 @@ services:
     restart: unless-stopped
 
   coredns:
-    image: coredns/coredns:1.12.1
+    image: coredns/coredns:1.14.6
     container_name: coredns
     network_mode: "service:wireguard"
     command: -conf /etc/coredns/Corefile
