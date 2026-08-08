@@ -74,6 +74,40 @@ The wizard prompts for your public IP, WireGuard port, and subnet ranges, then:
 - Writes `data/wireguard/wg_confs/wg0.conf`
 - Starts the Docker Compose stack
 
+### Update the gateway
+
+Pull the images configured in `docker-compose.yml` and apply them with:
+
+```bash
+bash scripts/update-gateway.sh
+```
+
+The script pulls all images before it changes the running stack, then Compose
+recreates only services with a changed image or configuration. This is the
+least-disruptive update possible for this deployment. Because Nginx and CoreDNS
+share WireGuard's network namespace and every service has one replica, a
+WireGuard image update causes a brief restart of the entire gateway stack.
+Afterward, it removes dangling images left by replaced containers while
+retaining images used by any container.
+
+#### Schedule updates with cron
+
+Open the gateway user's crontab:
+
+```bash
+crontab -e
+```
+
+Add the following line to run the update every Sunday at 03:00. Replace
+`/home/user/edge-gateway-hub` with the absolute path to this repository:
+
+```cron
+0 3 * * 0 /home/user/edge-gateway-hub/scripts/update-gateway.sh >> /var/log/edge-gateway-hub-update.log 2>&1
+```
+
+The cron user must be allowed to run Docker. The log captures both normal
+output and errors; inspect it after the first scheduled run.
+
 ### 2. Add peers
 
 ```bash
@@ -156,6 +190,10 @@ bash scripts/site/add.sh 53 services01 53 udp
 ```
 
 ## Script Reference
+
+| Script | Description |
+|--------|-------------|
+| `update-gateway.sh` | Pull configured images and recreate changed Compose services |
 
 ### Peer management (`scripts/peer/`)
 

@@ -69,6 +69,7 @@ edge-gateway-hub/
 │   └── nginx/                # Dynamically generated Nginx stream configurations
 ├── scripts/
 │   ├── setup-gateway.sh      # Initializes gateway setup and starts the stack
+│   ├── update-gateway.sh     # Pulls current images and reapplies the stack
 │   ├── peer/                 # Scripts for WireGuard participants
 │   │   ├── add.sh            # Generates keys, updates IPAM, server config AND client/peer config file
 │   │   ├── remove.sh         # Removes peer and releases IP
@@ -96,7 +97,22 @@ edge-gateway-hub/
 * Starts the container stack via Docker Compose.
 * Creates the DNS record directory and generates its initial empty hosts file.
 
-### B. Peer & Client Management (`scripts/peer/`)
+### B. Stack Updates (`update-gateway.sh`)
+* Pulls the images referenced by `docker-compose.yml` before changing running
+  containers, so a failed pull leaves the existing stack intact.
+* Reapplies the Compose stack in detached mode and removes orphaned services.
+  Compose recreates only services whose image or configuration changed.
+* After the updated stack is running, prunes dangling images left behind by
+  replaced containers. Images still used by any container are retained.
+* Can be scheduled with cron using an absolute script path and log file, for
+  example weekly on Sunday at 03:00:
+  `0 3 * * 0 /home/user/edge-gateway-hub/scripts/update-gateway.sh >> /var/log/edge-gateway-hub-update.log 2>&1`.
+* Updates are best-effort rolling: the WireGuard, Nginx, and CoreDNS services
+  share WireGuard's network namespace and are single instances, so an updated
+  WireGuard image necessarily causes a brief restart of all three services;
+  true zero-downtime replacement is not possible with this architecture.
+
+### C. Peer & Client Management (`scripts/peer/`)
 * **`add.sh <name> <type>`** (where `<type>` accepts `client`, `internal`, or `edge`):
   * Checks `ipam.json` and determines the next available IP in the corresponding subnet.
   * Generates a local WireGuard key pair and saves it under `data/keys/<name>/`.
@@ -115,7 +131,7 @@ edge-gateway-hub/
     `connected` when its handshake is at most three minutes old, `stale` when
     older, and `never` when it has not completed a handshake.
 
-### C. Site & Domain Routing (`scripts/site/`)
+### D. Site & Domain Routing (`scripts/site/`)
 * **`add.sh <domain-or-port> <target-peer-name> [target-port] [protocol]`:**
   * Resolves the named peer from IPAM. Port routes and public domain routes require an Edge Service Peer. A domain targeting an Internal Node creates a private DNS record and does not require a target port.
   * Multiple distinct public domains may target the same Edge Service Peer. Public domain routes default to backend port `443` when `target-port` is omitted; specify `target-port` to use a different backend port. Port-based routes always require a target port.
@@ -130,13 +146,13 @@ edge-gateway-hub/
 * **`list.sh`:**
   * Displays all active forwards.
 
-### D. DNS Resolution
+### E. DNS Resolution
 
 * **Private DNS:** The `coredns` container shares the WireGuard network namespace and is not published on a host DNS port. Generated exact records are stored in `data/dns/hosts` and `data/dns/exact.conf`, and generated wildcard rules are stored in `data/dns/wildcards.conf`; `ipam.json` and private site definitions are their source of truth. An Internal Node named `home-server` resolves as `home-server.internal` to its `10.102.x.x`, and configured exact or wildcard private domains resolve directly to their assigned address.
 * **WireGuard clients:** Generated Access Client profiles configure `DNS = <Internal Node Network hub address>`, normally `10.102.0.1`. Their existing route to the Internal Node Network therefore carries DNS queries to the gateway. Internal and Edge Service Peer profiles do not use the gateway DNS unless their operators configure it explicitly.
 * **Public names:** Queries outside `internal`, including public domains used by Edge Service Peers, are forwarded by CoreDNS to its configured upstream resolver. Public internet clients resolve Edge Service Peer domains through normal public DNS, which must publish A/AAAA records pointing to the gateway's public IP; Nginx then selects the private backend by SNI.
 
-### E. Internal and Edge Node Compose Example
+### F. Internal and Edge Node Compose Example
 
 * `examples/node/docker-compose.yml` provides a minimal deployment for either
   an Internal Node or an Edge Service Peer. The operator copies the generated
