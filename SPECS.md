@@ -73,6 +73,7 @@ edge-gateway-hub/
 │   │   ├── add.sh            # Generates keys, updates IPAM, server config AND client/peer config file
 │   │   ├── remove.sh         # Removes peer and releases IP
 │   │   └── list.sh           # Lists active peers/clients
+│   │   └── status.sh         # Shows live WireGuard handshake and traffic status
 │   └── site/                 # Scripts for private DNS and public forwarding
 │       ├── add.sh            # Maps a private domain or public route to a peer
 │       ├── remove.sh         # Deletes a site rule
@@ -107,6 +108,12 @@ edge-gateway-hub/
   * Refuses to remove a peer while a private DNS or public routing rule references its name.
 * **`list.sh`:**
   * Outputs a tabular overview of all registered peers, their zones, and IP addresses.
+* **`status.sh`:**
+  * Queries the running WireGuard container and joins its live peer data to IPAM.
+  * Outputs each registered peer's type, address, connection state, last-handshake
+    age, transfer totals, and most recently observed endpoint. A peer is marked
+    `connected` when its handshake is at most three minutes old, `stale` when
+    older, and `never` when it has not completed a handshake.
 
 ### C. Site & Domain Routing (`scripts/site/`)
 * **`add.sh <domain-or-port> <target-peer-name> [target-port] [protocol]`:**

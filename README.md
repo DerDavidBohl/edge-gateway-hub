@@ -164,6 +164,7 @@ bash scripts/site/add.sh 53 services01 53 udp
 | `add.sh <name> <type>` | Generate keys, allocate IP, create client config, hot-reload WireGuard |
 | `remove.sh <name>` | Remove peer from server config, release IP, delete key files |
 | `list.sh` | Tabular overview of all registered peers |
+| `status.sh` | Live handshake, traffic, and endpoint status for registered peers |
 
 ### Site routing (`scripts/site/`)
 
