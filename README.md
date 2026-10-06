@@ -15,16 +15,16 @@ Internet
 ┌──────────────────────────────────────────────────────────┐
 │  Docker Host (public IP)                                 │
 │                                                          │
-│  ┌─────────────────┐     ┌──────────────────────────┐   │
-│  │  nginx:alpine   │     │  linuxserver/wireguard   │   │
-│  │  (stream proxy) │◄────│  (wg0 VPN hub)           │   │
-│  │  Layer 4 TCP/UDP│     │  network namespace owner  │   │
-│  └─────────────────┘     └──────────────────────────┘   │
+│  ┌─────────────────┐     ┌──────────────────────────┐    │
+│  │  nginx:alpine   │     │  linuxserver/wireguard   │    │
+│  │  (stream proxy) │◄────│  (wg0 VPN hub)           │    │
+│  │  Layer 4 TCP/UDP│     │  network namespace owner │    │
+│  └─────────────────┘     └──────────────────────────┘    │
 │   network_mode: service:wireguard                        │
 └──────────────────────────────────────────────────────────┘
-        │              │
+        │               │
         │ WireGuard     │ WireGuard
-        ▼              ▼
+        ▼               ▼
    Access Clients  Internal / Edge Service Peers
 ```
 
