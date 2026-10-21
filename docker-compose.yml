@@ -40,7 +40,7 @@ services:
     restart: unless-stopped
 
   coredns:
-    image: coredns/coredns:1.14.7
+    image: coredns/coredns:1.15.0
     container_name: coredns
     network_mode: "service:wireguard"
     command: -conf /etc/coredns/Corefile
